@@ -189,7 +189,14 @@ class Surety(gl.Contract):
             ),
         )
 
-        data = json.loads(raw)
+        text = str(raw or "").strip()
+        if "```" in text:
+            text = text.replace("```json", "").replace("```", "").strip()
+        try:
+            a, b = text.find("{"), text.rfind("}")
+            data = json.loads(text[a:b+1] if a >= 0 and b > a else text)
+        except Exception:
+            data = {"impair": False, "confidence": 0.0, "reason": "unparsed"}
         impair = bool(data.get("impair", False))
         reason = str(data.get("reason", ""))
         b.open = False

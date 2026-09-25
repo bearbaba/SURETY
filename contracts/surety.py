@@ -10,7 +10,7 @@ import typing
 @dataclass
 class Bond:
     principal: Address
-    client: Address
+    client: str
     spec_url: str
     artifact_url: str
     standard: str
@@ -115,7 +115,7 @@ class Surety(gl.Contract):
         bid = self.next_id
         self.bonds[bid] = Bond(
             principal=gl.message.sender_address,
-            client=Address(client),
+            client=client.strip(),
             spec_url=spec_url,
             artifact_url=artifact_url,
             standard=standard,
@@ -142,8 +142,10 @@ class Surety(gl.Contract):
     def contest(self, bond_id: int, statement: str) -> str:
         bid = u256(bond_id)
         b = self.bonds[bid]
-        who = gl.message.sender_address
-        assert who == b.client or who == self.owner, "no standing"
+        who = gl.message.sender_address.as_hex.lower()
+        cli = b.client.strip().lower()
+        own = self.owner.as_hex.lower()
+        assert who == cli or who == own, "no standing"
         assert b.open and not b.settled, "closed"
         need = b.notional * self.contest_bps // u256(10000)
         assert gl.message.value >= need, "contest bond"

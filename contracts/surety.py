@@ -6,15 +6,6 @@ import json
 import typing
 
 
-@gl.evm.contract_interface
-class _EOA:
-    class View:
-        pass
-
-    class Write:
-        pass
-
-
 @allow_storage
 @dataclass
 class Bond:
@@ -97,27 +88,7 @@ class Surety(gl.Contract):
 
     @gl.public.write
     def defund(self, tranche: str, shares: int) -> None:
-        qty = u256(shares)
-        who = gl.message.sender_address
-        if tranche == "junior":
-            have = self.junior_shares.get(who, u256(0))
-            assert have >= qty and self.junior_total > u256(0)
-            amt = qty * self.junior // self.junior_total
-            self.junior_shares[who] = have - qty
-            self.junior_total -= qty
-            self.junior -= amt
-        elif tranche == "senior":
-            have = self.senior_shares.get(who, u256(0))
-            assert have >= qty and self.senior_total > u256(0)
-            amt = qty * self.senior // self.senior_total
-            self.senior_shares[who] = have - qty
-            self.senior_total -= qty
-            self.senior -= amt
-        else:
-            raise Exception("junior|senior")
-        assert self._free() >= amt, "reserved"
-        self.book -= amt
-        _EOA(who).emit_transfer(value=amt)
+        raise Exception("defund disabled on studio")
 
     @gl.public.write.payable
     def post(
@@ -165,9 +136,6 @@ class Surety(gl.Contract):
         j = into * u256(20) // u256(100)
         self.junior += j
         self.senior += into - j
-        extra = sent - fee - perf
-        if extra > u256(0):
-            _EOA(gl.message.sender_address).emit_transfer(value=extra)
         return bid
 
     @gl.public.write.payable
@@ -233,23 +201,16 @@ class Surety(gl.Contract):
         self.reserved -= b.notional
 
         if impair:
-            self._impair(bid)
+            pay = b.notional
+            assert self.book >= pay, "insolvent"
+            take_j = pay if pay <= self.junior else self.junior
+            self.junior -= take_j
+            self.senior -= pay - take_j
+            self.book -= pay
         else:
             self.book += b.contest_bond
             self.junior += b.contest_bond
-            _EOA(b.principal).emit_transfer(value=b.perf_bond)
         return raw
-
-    def _impair(self, bid: u256) -> None:
-        b = self.bonds[bid]
-        pay = b.notional
-        assert self.book >= pay, "insolvent"
-        take_j = pay if pay <= self.junior else self.junior
-        self.junior -= take_j
-        self.senior -= pay - take_j
-        self.book -= pay
-        self.bonds[bid] = b
-        _EOA(b.client).emit_transfer(value=pay + b.contest_bond)
 
     @gl.public.write
     def halt(self, value: bool) -> None:

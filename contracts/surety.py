@@ -102,7 +102,7 @@ class Surety(gl.Contract):
     ) -> u256:
         assert not self.halted, "halted"
         assert spec_url and artifact_url and standard, "pin urls"
-        n = u256(notional)
+        n = u256(notional) * u256(10**18)
         fee = n * self.fee_bps // u256(10000)
         perf = n * self.perf_bps // u256(10000)
         sent = gl.message.value
@@ -142,10 +142,9 @@ class Surety(gl.Contract):
     def contest(self, bond_id: int, statement: str) -> str:
         bid = u256(bond_id)
         b = self.bonds[bid]
-        who = gl.message.sender_address.as_hex.lower()
-        cli = b.client.strip().lower()
-        own = self.owner.as_hex.lower()
-        assert who == cli or who == own, "no standing"
+        who = gl.message.sender_address
+        cli = b.client.strip().lower().replace("0x", "")
+        assert who == self.owner or who.as_hex.lower().replace("0x", "") == cli, "no standing"
         assert b.open and not b.settled, "closed"
         need = b.notional * self.contest_bps // u256(10000)
         assert gl.message.value >= need, "contest bond"
